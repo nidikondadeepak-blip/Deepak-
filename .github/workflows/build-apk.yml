@@ -1,0 +1,73 @@
+# Builds the Shinobi Arena Android APK (offline demo, Capacitor + Gradle)
+# and publishes it to the "latest" release. Triggers on every app push.
+name: Build Android APK
+
+on:
+  push:
+    branches: ['arena/01a0be69-deepak']
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'scripts/**'
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build web assets
+        run: node scripts/build-pages.mjs
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk shinobi-arena.apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shinobi-arena-apk
+          path: shinobi-arena.apk
+
+      - name: Publish to latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Shinobi Arena (Android APK)
+          body: |
+            🍃 **Shinobi Arena** — Naruto 3D battle royale for Android (offline demo: you vs 7 bots).
+            1. Download `shinobi-arena.apk` below
+            2. Open it on your phone → Allow "install unknown apps" if asked → Install
+            3. Play! Believe it!
+          files: shinobi-arena.apk

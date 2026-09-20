@@ -1,0 +1,9 @@
+{
+  "appId": "com.shinobiarena.game",
+  "appName": "Shinobi Arena",
+  "webDir": "docs",
+  "backgroundColor": "#14121f",
+  "android": {
+    "allowMixedContent": false
+  }
+}

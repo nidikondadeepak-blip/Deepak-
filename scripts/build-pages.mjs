@@ -26,6 +26,9 @@ fs.copyFileSync(
   path.join(DOCS, 'vendor', 'three', 'three.module.js')
 );
 
+// don't ship the 1.8MB source icon (resized copies are used instead)
+fs.rmSync(path.join(DOCS, 'icons', 'icon-src.png'), { force: true });
+
 fs.writeFileSync(path.join(DOCS, '.nojekyll'), '');
 
 // verify

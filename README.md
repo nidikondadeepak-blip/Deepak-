@@ -22,6 +22,16 @@ flip one switch (30 seconds, phone-friendly):
 Hit **▶ PLAY** and you're fighting 7 bot ninjas in Konoha — touch controls work on mobile.
 (Online multiplayer rooms need `npm start` below or a host from the next section.)
 
+## 📱 Install as an app
+
+**Android APK (recommended):**
+1. Open the [**latest release**](https://github.com/nidikondadeepak-blip/Deepak-/releases/tag/latest)
+2. Download `shinobi-arena.apk` → open it → allow *Install unknown apps* if asked → Install
+3. Play offline — no internet needed after install! (APK auto-rebuilds on every push via GitHub Actions.)
+
+**Install from browser (PWA):** open the Pages link above in Chrome → menu **⋮** → **Install app** / **Add to Home screen**.
+Works offline after the first visit.
+
 ## ▶ Run it locally (30 seconds, full online multiplayer)
 
 ```bash

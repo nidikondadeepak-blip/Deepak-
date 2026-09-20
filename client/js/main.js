@@ -271,6 +271,10 @@ function quitToHome() {
 
 // -------------------------------------------------------------------- boot
 async function boot() {
+  // PWA: offline play + installability (silent no-op where unsupported)
+  try {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  } catch { /* service workers unavailable */ }
   startBgLeaves();
   if (OFFLINE) {
     // Browser-only demo: config comes from bundled sim modules, matches run
