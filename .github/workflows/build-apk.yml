@@ -61,9 +61,10 @@ jobs:
             echo "== wrapper =="; grep distributionUrl gradle/wrapper/gradle-wrapper.properties
             echo "== settings =="; cat settings.gradle
           } > /tmp/gradle.log 2>&1
-          ./gradlew assembleDebug --no-daemon --stacktrace >> /tmp/gradle.log 2>&1 || {
-            echo "GRADLE FAILED - tail of log:"
-            tail -n 45 /tmp/gradle.log | sed 's/^/::error::/'
+          ./gradlew assembleDebug --no-daemon >> /tmp/gradle.log 2>&1 || {
+            echo "GRADLE FAILED - error summary:"
+            grep -E "What went wrong|Caused by|FAILED|FAILURE:|Execution failed|error:" /tmp/gradle.log | head -n 20 | sed 's/^/::error::/'
+            grep -A10 "What went wrong" /tmp/gradle.log | head -n 14 | sed 's/^/::error::/'
             exit 1
           }
 
