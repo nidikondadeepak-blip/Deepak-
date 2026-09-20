@@ -24,6 +24,9 @@ const io = new Server(server, {
 // --- static client + vendored three.js (no CDN needed) ---
 app.use(express.static(path.join(ROOT, 'client')));
 app.use('/vendor/three', express.static(path.join(ROOT, 'node_modules', 'three', 'build')));
+// pure-sim modules (constants/mapLayout/GameRoom) are importable by the
+// browser too, powering the offline demo + shared tuning
+app.use('/server', express.static(path.join(ROOT, 'server'), { index: false }));
 
 // --- config APIs: single source of truth for tuning / maps ---
 app.get('/api/config', (_req, res) => res.json(getConfigPayload()));

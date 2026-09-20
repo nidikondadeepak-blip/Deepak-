@@ -27,24 +27,42 @@ test('all-bot match runs to completion with a winner', () => {
     '| kills:', room.result.placements.map((p) => `${p.name}:${p.kills}`).join(', '));
 });
 
-test('squad match completes and sakura heals allies', () => {
+test('squad match completes', () => {
   const room = new GameRoom('TEST2', { mapId: 'training-grounds', mode: 'squad' });
   room.addPlayer('h1', 'Human', 'sakura', false);
   room.fillWithBots(6);
   assert.equal(room.startCountdown(), true);
-  // fast-forward into the match
-  for (let i = 0; i < 20 * 8; i++) room.update();
-  assert.equal(room.state, 'playing');
-  const sakura = room.players.get('h1');
-  sakura.hp = 100;
-  room.useSkill(sakura, 0, 0);
-  assert.ok(sakura.healPool > 0, 'sakura should have a heal pool');
-  for (let i = 0; i < 20 * 4; i++) room.update();
-  assert.ok(sakura.hp > 100, 'sakura should have healed');
   let guard = 20 * 60 * 10;
   while (room.state !== 'ended' && guard-- > 0) room.update();
   assert.equal(room.state, 'ended');
   console.log('  squad winner:', room.result.winner.name, '| reason:', room.result.reason);
+});
+
+test('sakura heals herself and nearby squadmates (deterministic)', () => {
+  const room = new GameRoom('TEST2b', { mapId: 'konoha', mode: 'squad' });
+  room.addPlayer('s1', 'Sakura', 'sakura', false);
+  room.addPlayer('s2', 'AllyBot', 'naruto', true);
+  room.addPlayer('s3', 'DummyFoe', 'lee', true); // keeps 2 teams alive so the match runs
+  const sakura = room.players.get('s1');
+  const ally = room.players.get('s2');
+  const foe = room.players.get('s3');
+  ally.team = sakura.team;
+  if (foe.team === sakura.team) foe.team = sakura.team + 1;
+  assert.equal(room.startCountdown(), true);
+  for (let i = 0; i < 20 * 7; i++) room.update();
+  assert.equal(room.state, 'playing');
+  // freeze the bots: nobody moves or attacks, match stays live, zero damage
+  ally.stunUntil = 1e9;
+  foe.stunUntil = 1e9;
+  // hurt both squadmates, stand them together, cast Medical Ninjutsu
+  sakura.hp = 100; sakura.chakra = 100; sakura.stunUntil = 0; sakura.lock = null;
+  ally.hp = 100;
+  ally.x = sakura.x + 2; ally.z = sakura.z; ally.y = sakura.y;
+  room.useSkill(sakura, 0, 0);
+  assert.ok(sakura.healPool > 0, 'sakura should have a heal pool');
+  for (let i = 0; i < 20 * 4; i++) room.update();
+  assert.ok(sakura.hp > 150, `sakura healed to ${sakura.hp}`);
+  assert.ok(ally.hp > 130, `squadmate healed to ${ally.hp}`);
 });
 
 test('skills resolve: rasengan / chidori / barrage / byakugan', () => {
