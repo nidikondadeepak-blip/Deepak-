@@ -8,7 +8,21 @@ rooftop parkour across Konoha, shrinking barrier, real-time multiplayer, bots, s
 
 ---
 
-## ▶ Run it (30 seconds)
+## 🎮 Play in your browser NOW (free offline demo — you vs 7 bots)
+
+The demo site is **already built and pushed** in [`docs/`](docs/). To get your permanent public link,
+flip one switch (30 seconds, phone-friendly):
+
+1. Open your repo: `github.com/nidikondadeepak-blip/Deepak-`
+2. Tap **Settings** (⚙ tab) → **Pages** (left menu)
+3. Under *Build and deployment*: Source = **Deploy from a branch**
+4. Branch = **`arena/01a0be69-deepak`** + folder **`/docs`** → **Save**
+5. Wait ~1 minute, open: **`https://nidikondadeepak-blip.github.io/Deepak-/`** 🎉
+
+Hit **▶ PLAY** and you're fighting 7 bot ninjas in Konoha — touch controls work on mobile.
+(Online multiplayer rooms need `npm start` below or a host from the next section.)
+
+## ▶ Run it locally (30 seconds, full online multiplayer)
 
 ```bash
 npm install
