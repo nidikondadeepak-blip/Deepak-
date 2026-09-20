@@ -389,12 +389,7 @@ async function boot() {
   $('btn-resume').onclick = () => {
     sfx.click();
     $('pause-menu').classList.add('hidden');
-    if (game && !game.isTouch()) {
-      try {
-        const p = $('game-canvas').requestPointerLock();
-        if (p && p.catch) p.catch(() => toast('Click the battlefield to re-lock aim'));
-      } catch { toast('Click the battlefield to re-lock aim'); }
-    }
+    if (game) game.tryLock();
   };
   $('btn-quit').onclick = () => { sfx.click(); quitToHome(); };
   document.addEventListener('pointerlockchange', () => {

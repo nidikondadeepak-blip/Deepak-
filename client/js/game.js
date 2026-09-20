@@ -83,6 +83,7 @@ export class Game {
     document.addEventListener('mouseup', this._onMouseUp);
     document.addEventListener('wheel', this._onWheel, { passive: true });
     document.addEventListener('pointerlockchange', this._onLockChange);
+    document.addEventListener('pointerlockerror', this._onLockError);
     document.addEventListener('contextmenu', this._onCtx);
     this.canvas.addEventListener('click', this._onCanvasClick);
     this.bindTouch();
@@ -114,6 +115,7 @@ export class Game {
     document.removeEventListener('mouseup', this._onMouseUp);
     document.removeEventListener('wheel', this._onWheel);
     document.removeEventListener('pointerlockchange', this._onLockChange);
+    document.removeEventListener('pointerlockerror', this._onLockError);
     document.removeEventListener('contextmenu', this._onCtx);
     this.canvas.removeEventListener('click', this._onCanvasClick);
     if (document.pointerLockElement) document.exitPointerLock();
@@ -162,10 +164,19 @@ export class Game {
   _onKeyUp = (e) => { this.keys[e.code] = false; };
 
   _onMouseMove = (e) => {
-    if (!this.locked) return;
+    if (!this.locked && !this.fallbackLook) return;
+    if (this.fallbackLook && !this.locked) {
+      // don't steer while paused or off-screen
+      if (!document.getElementById('screen-game').classList.contains('active')) return;
+      if (!document.getElementById('pause-menu').classList.contains('hidden')) return;
+    }
+    // movementX works unlocked in Chrome/FF; Safari fallback via clientX delta
+    const mx = e.movementX ?? (e.clientX - (this._lastCX ?? e.clientX));
+    const my = e.movementY ?? (e.clientY - (this._lastCY ?? e.clientY));
+    this._lastCX = e.clientX; this._lastCY = e.clientY;
     const s = 0.0026 * (this.settings.sens || 1);
-    this.yaw -= e.movementX * s;
-    this.pitch -= e.movementY * s * (this.settings.invertY ? -1 : 1);
+    this.yaw -= mx * s;
+    this.pitch -= my * s * (this.settings.invertY ? -1 : 1);
     this.pitch = Math.max(-1.1, Math.min(1.1, this.pitch));
   };
 
@@ -173,7 +184,7 @@ export class Game {
     if (!document.getElementById('screen-game').classList.contains('active')) return;
     if (e.target !== this.canvas) return; // ignore clicks on HUD buttons
     if (e.button === 0) {
-      if (!this.locked && !this.isTouch()) { this.canvas.requestPointerLock?.(); return; }
+      if (!this.locked && !this.fallbackLook && !this.isTouch()) { this.tryLock(); return; }
       this.firing = true;
       this.tryFire();
     }
