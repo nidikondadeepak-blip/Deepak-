@@ -21,6 +21,22 @@ npm start
   (`http://YOUR-IP:3000`). Add bots, press START.
 - `npm test` = headless sim tests · `node tests/e2e.test.js` = live 2-client network test (server must be running).
 
+## 🌍 Put it online free (get a permanent link)
+
+Pick any one — no code changes needed:
+
+**Render.com (recommended, free):**
+1. Push this repo to GitHub (it already is — branch `arena/01a0be69-deepak`)
+2. Go to [render.com](https://render.com) → New → Web Service → connect your repo
+3. Build: `npm install` · Start: `npm start` (auto-detected from `render.yaml`)
+4. Open your `https://shinobi-arena.onrender.com` link and play! 🎮
+
+**Replit (free, works from your phone):**
+1. Go to [replit.com](https://replit.com) → Create → Import from GitHub → paste your repo URL
+2. Press **Run** — Replit gives you a public link instantly
+
+**Railway.app (free trial):** New Project → Deploy from GitHub → done (`Procfile` included).
+
 > No build step, no CDN calls — Three.js is vendored via npm and served locally, SFX are synthesized in code.
 
 ---
