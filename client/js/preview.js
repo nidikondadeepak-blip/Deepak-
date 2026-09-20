@@ -1,7 +1,7 @@
 // ============================================================================
 // SHINOBI ARENA — character-select 3D preview (rotatable ninja on pedestal)
 // ============================================================================
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/three.module.js';
 import { createNinjaMesh, animateNinja, toon } from './characters.js';
 
 export function createPreview(canvas) {

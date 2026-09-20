@@ -2,7 +2,7 @@
 // SHINOBI ARENA — Konoha world builder. Builds the full 3D village from the
 // server's authoritative layout JSON, so visuals and collision always match.
 // ============================================================================
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/three.module.js';
 import { toon, getGradientMap } from './characters.js';
 
 function textTexture(text, { w = 256, h = 128, bg = '#f5ecd8', fg = '#c0272d', font = '900 84px "Trebuchet MS", sans-serif' } = {}) {

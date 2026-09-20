@@ -3,7 +3,7 @@
 // interpolation, combat feedback. Server is authoritative; we predict nothing
 // except input intent + optimistic weapon/sound feedback.
 // ============================================================================
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/three.module.js';
 import { createNinjaMesh, animateNinja, updatePlate } from './characters.js';
 import { buildWorld } from './world.js';
 import { createProjectileMesh, updateProjectileMesh } from './weapons.js';

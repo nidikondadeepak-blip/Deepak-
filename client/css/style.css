@@ -72,6 +72,7 @@ body {
 
 /* ---------- loading ---------- */
 .loader-box { text-align: center; }
+.loader-ver { margin-top: 10px; font-size: 12px; opacity: .6; }
 .loader-swirl {
   width: 90px; height: 90px; margin: 0 auto 16px; border-radius: 50%;
   background: conic-gradient(var(--orange), var(--red), var(--yellow), var(--orange));

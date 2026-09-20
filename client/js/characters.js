@@ -3,7 +3,7 @@
 // One rig, five flavors (hair / outfit / eyes per hero). Used by both the
 // live game and the character-select 3D preview.
 // ============================================================================
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/three.module.js';
 
 let gradientMap = null;
 export function getGradientMap() {

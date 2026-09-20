@@ -1,7 +1,7 @@
 // ============================================================================
 // SHINOBI ARENA — particle system + jutsu effects (Rasengan, Chidori, heals…)
 // ============================================================================
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/three.module.js';
 
 const MAX_PARTICLES = 1600;
 

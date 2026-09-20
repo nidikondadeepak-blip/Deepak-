@@ -23,6 +23,7 @@
     <div class="loader-swirl"></div>
     <h2>Summoning the Nine-Tails…</h2>
     <p id="loading-msg">Loading config…</p>
+    <p class="loader-ver">Shinobi Arena · app v1.0.1</p>
   </div>
 </div>
 
@@ -321,8 +322,26 @@
 
 <div id="toast-container"></div>
 
-<script type="importmap">
-{ "imports": { "three": "./vendor/three/three.module.js" } }
+<script>
+// Show boot errors on the loading screen instead of a stuck black loader.
+// (Classic script runs before the module below, so it catches module failures too.)
+window.addEventListener('error', function (e) {
+  var el = document.getElementById('loading-msg');
+  var box = document.getElementById('loading');
+  if (el && box && !box.classList.contains('hidden')) {
+    el.textContent = 'Error: ' + ((e && e.message) || 'failed to load');
+    el.style.color = '#ff6b6b';
+  }
+}, true);
+window.addEventListener('unhandledrejection', function (e) {
+  var el = document.getElementById('loading-msg');
+  var box = document.getElementById('loading');
+  if (el && box && !box.classList.contains('hidden')) {
+    var r = e && e.reason;
+    el.textContent = 'Error: ' + ((r && (r.message || r)) || 'failed to load');
+    el.style.color = '#ff6b6b';
+  }
+});
 </script>
 <script type="module" src="js/main.js"></script>
 </body>

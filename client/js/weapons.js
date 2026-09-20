@@ -1,7 +1,7 @@
 // ============================================================================
 // SHINOBI ARENA — flying projectile meshes (kunai / shuriken / paper-bomb)
 // ============================================================================
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/three.module.js';
 import { toon } from './characters.js';
 
 const steel = 0xd5dde8, dark = 0x3a3f4a;
