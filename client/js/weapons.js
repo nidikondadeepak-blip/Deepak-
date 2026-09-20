@@ -52,6 +52,22 @@ function bombMesh() {
   return g;
 }
 
+let glowTex = null;
+function getGlowTex() {
+  if (glowTex) return glowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.4, 'rgba(255,240,200,0.55)');
+  grad.addColorStop(1, 'rgba(255,240,200,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(c);
+  return glowTex;
+}
+
 export function createProjectileMesh(kind) {
   let obj;
   if (kind === 'shuriken') obj = shurikenMesh();
@@ -59,6 +75,14 @@ export function createProjectileMesh(kind) {
   else obj = kunaiMesh();
   obj.userData.kind = kind;
   obj.userData.spin = Math.random() * 10;
+  // additive glow + motion stretch so throws read clearly at speed
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: getGlowTex(), color: kind === 'bomb' ? 0xff9a3c : 0xd8f4ff,
+    transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  glow.scale.setScalar(kind === 'bomb' ? 1.0 : 0.55);
+  obj.add(glow);
+  if (kind === 'kunai') obj.scale.set(1, 1, 1.6);
   return obj;
 }
 

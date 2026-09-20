@@ -1,6 +1,8 @@
 // ============================================================================
 // SHINOBI ARENA — Konoha world builder. Builds the full 3D village from the
 // server's authoritative layout JSON, so visuals and collision always match.
+// v1.1 clarity pass: textured ground/roads/plaza, glowing roof eaves,
+// ramen beacon beams, pulsing barrier, brighter anime lighting.
 // ============================================================================
 import * as THREE from '../vendor/three/three.module.js';
 import { toon, getGradientMap } from './characters.js';
@@ -17,11 +19,101 @@ function textTexture(text, { w = 256, h = 128, bg = '#f5ecd8', fg = '#c0272d', f
   return t;
 }
 
+// speckled ground texture baked in the map's base color (kills flat-color blur)
+function groundTexture(baseHex, repeat = 48) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#' + baseHex.toString(16).padStart(6, '0');
+  g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 2600; i++) {
+    g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)';
+    const s = 1 + Math.random() * 2.5;
+    g.fillRect(Math.random() * 256, Math.random() * 256, s, s);
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256, r = 18 + Math.random() * 40;
+    const grad = g.createRadialGradient(x, y, 2, x, y, r);
+    grad.addColorStop(0, Math.random() < 0.5 ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat, repeat);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+// road texture: edge lines + center wear so streets read from the air
+function roadTexture(baseHex, along = 28) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#' + baseHex.toString(16).padStart(6, '0');
+  g.fillRect(0, 0, 128, 256);
+  for (let i = 0; i < 500; i++) {
+    g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+    g.fillRect(Math.random() * 128, Math.random() * 256, 2, 2);
+  }
+  g.fillStyle = 'rgba(60,40,20,0.55)';
+  g.fillRect(0, 0, 6, 256); g.fillRect(122, 0, 6, 256);
+  g.fillStyle = 'rgba(255,255,255,0.28)';
+  for (let y = 0; y < 256; y += 42) g.fillRect(60, y, 8, 22);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1, along);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+// plaza texture: concentric stone rings + center emblem
+function plazaTexture(baseHex) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#' + baseHex.toString(16).padStart(6, '0');
+  g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = 'rgba(60,50,40,0.5)';
+  for (let r = 30; r < 130; r += 20) {
+    g.lineWidth = r % 40 === 30 ? 5 : 2;
+    g.beginPath(); g.arc(128, 128, r, 0, Math.PI * 2); g.stroke();
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    g.strokeStyle = 'rgba(60,50,40,0.4)';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(128 + Math.cos(a) * 30, 128 + Math.sin(a) * 30);
+    g.lineTo(128 + Math.cos(a) * 126, 128 + Math.sin(a) * 126);
+    g.stroke();
+  }
+  g.fillStyle = '#2f8f4d';
+  g.beginPath(); g.arc(128, 128, 16, 0, Math.PI * 2); g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
 function box(w, h, d, color, x = 0, y = 0, z = 0, ry = 0) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(color));
   m.position.set(x, y, z); m.rotation.y = ry;
   m.castShadow = true; m.receiveShadow = true;
   return m;
+}
+
+// bright rectangular frame — makes roof/platform edges pop from far away
+function edgeFrame(w, d, color, thick = 0.5, h = 0.28) {
+  const g = new THREE.Group();
+  g.add(box(w, h, thick, color, 0, 0, -d / 2));
+  g.add(box(w, h, thick, color, 0, 0, d / 2));
+  g.add(box(thick, h, d, color, -w / 2, 0, 0));
+  g.add(box(thick, h, d, color, w / 2, 0, 0));
+  return g;
 }
 
 const HOUSE_TINTS = [0xf3e2c2, 0xe8d3ae, 0xdfc49a, 0xf6ead2, 0xe2cfa8];
@@ -42,12 +134,12 @@ export function buildWorld(scene, layout, quality = 'med') {
   const S = layout.size, half = S / 2;
   const updatables = [];
 
-  // --- lights & sky ---
+  // --- lights & sky (bright anime look, far fog for clarity) ---
   scene.background = new THREE.Color(layout.sky.top);
-  scene.fog = new THREE.Fog(layout.sky.bottom, 120, 320);
-  const hemi = new THREE.HemisphereLight(layout.sky.top, layout.ground.base, 0.9);
+  scene.fog = new THREE.Fog(layout.sky.bottom, 150, 380);
+  const hemi = new THREE.HemisphereLight(layout.sky.top, layout.ground.base, 1.05);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(layout.sky.sun, 1.6);
+  const sun = new THREE.DirectionalLight(layout.sky.sun, 1.75);
   sun.position.set(60, 100, 30);
   sun.castShadow = quality !== 'low';
   sun.shadow.camera.left = -130; sun.shadow.camera.right = 130;
@@ -56,24 +148,28 @@ export function buildWorld(scene, layout, quality = 'med') {
   sun.shadow.mapSize.set(quality === 'high' ? 2048 : 1024, quality === 'high' ? 2048 : 1024);
   sun.shadow.bias = -0.0008;
   scene.add(sun);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
-  // --- ground ---
+  // --- textured ground ---
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(S + 200, S + 200),
-    new THREE.MeshToonMaterial({ color: layout.ground.base, gradientMap: getGradientMap() }));
+    new THREE.MeshToonMaterial({ color: 0xffffff, map: groundTexture(layout.ground.base), gradientMap: getGradientMap() }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   group.add(ground);
 
-  // plaza + roads
-  const plaza = new THREE.Mesh(new THREE.CircleGeometry(11, 32), toon(layout.ground.plaza));
+  // plaza + roads (textured)
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(11, 40),
+    new THREE.MeshToonMaterial({ color: 0xffffff, map: plazaTexture(layout.ground.plaza), gradientMap: getGradientMap() }));
   plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.02; plaza.receiveShadow = true;
   group.add(plaza);
-  const roadMat = toon(layout.ground.road);
-  const road1 = new THREE.Mesh(new THREE.PlaneGeometry(9, S), roadMat);
+  const road1 = new THREE.Mesh(new THREE.PlaneGeometry(9, S),
+    new THREE.MeshToonMaterial({ color: 0xffffff, map: roadTexture(layout.ground.road), gradientMap: getGradientMap() }));
   road1.rotation.x = -Math.PI / 2; road1.position.y = 0.015; road1.receiveShadow = true;
   group.add(road1);
-  const road2 = new THREE.Mesh(new THREE.PlaneGeometry(S, 9), roadMat);
+  const roadTex2 = roadTexture(layout.ground.road);
+  roadTex2.repeat.set(28, 1);
+  const road2 = new THREE.Mesh(new THREE.PlaneGeometry(S, 9),
+    new THREE.MeshToonMaterial({ color: 0xffffff, map: roadTex2, gradientMap: getGradientMap() }));
   road2.rotation.x = -Math.PI / 2; road2.position.y = 0.015; road2.receiveShadow = true;
   group.add(road2);
 
@@ -118,6 +214,10 @@ export function buildWorld(scene, layout, quality = 'med') {
         const roof = pyramidRoof(w * 1.25, d * 1.25, h * 0.42 + 1.2, roofC);
         roof.position.set(cx, yBase + bodyH + (h * 0.42 + 1.2) / 2 - 0.2, cz);
         group.add(roof);
+        // glowing eave frame so roof edges read from anywhere
+        const eave = edgeFrame(w * 1.27, d * 1.27, 0xfff2cc);
+        eave.position.set(cx, yBase + bodyH - 0.05, cz);
+        group.add(eave);
         // door + windows
         group.add(box(1.6, 2.2, 0.15, 0x5a3a22, cx, yBase + 1.1, cz + d / 2 + 0.05));
         group.add(box(1.4, 1.1, 0.12, 0x2b3a55, cx - w / 4, yBase + bodyH * 0.55, cz + d / 2 + 0.05));
@@ -129,6 +229,9 @@ export function buildWorld(scene, layout, quality = 'med') {
         const roof = pyramidRoof(w * 1.3, d * 1.3, h * 0.45, 0xb03030);
         roof.position.set(cx, yBase + h * 0.7 + h * 0.22, cz);
         group.add(roof);
+        const eave = edgeFrame(w * 1.32, d * 1.32, 0xffe9a0);
+        eave.position.set(cx, yBase + h * 0.7 - 0.05, cz);
+        group.add(eave);
         const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 3),
           new THREE.MeshBasicMaterial({ map: textTexture('火影', { w: 256, h: 128, bg: '#f0e4c8', fg: '#b03030' }) }));
         sign.position.set(cx, yBase + h * 0.55, cz + d / 2 + 0.06);
@@ -246,6 +349,9 @@ export function buildWorld(scene, layout, quality = 'med') {
       case 'platform': {
         const top = box(w, 0.4, d, 0x9a7048, cx, yBase + h - 0.2, cz);
         group.add(top);
+        const trim = edgeFrame(w + 0.3, d + 0.3, 0xffd23e, 0.35, 0.22);
+        trim.position.set(cx, yBase + h + 0.02, cz);
+        group.add(trim);
         if (yBase < 1) {
           group.add(box(w * 0.9, h, d * 0.9, 0x6e5638, cx, yBase + h / 2 - 0.2, cz));
         } else {
@@ -395,7 +501,7 @@ export function buildWorld(scene, layout, quality = 'med') {
     });
   }
 
-  // --- ramen pickups (bowls) ---
+  // --- ramen pickups (bowls + beacon beams so loot reads from far) ---
   const ramenMeshes = [];
   {
     const bowlGeo = new THREE.CylinderGeometry(0.5, 0.32, 0.35, 12);
@@ -409,15 +515,22 @@ export function buildWorld(scene, layout, quality = 'med') {
       const glow = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8),
         new THREE.MeshBasicMaterial({ color: 0x37e05a, transparent: true, opacity: 0.25 }));
       glow.position.y = 0.6;
-      g.add(bowl, soup, glow);
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 9, 10, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0x37e05a, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
+      beam.position.y = 4.8;
+      g.add(bowl, soup, glow, beam);
       g.position.set(p.x, 0, p.z);
       group.add(g);
       ramenMeshes.push(g);
-      updatables.push({ update: (_dt, t) => { g.rotation.y = t * 1.5; glow.scale.setScalar(1 + Math.sin(t * 4) * 0.12); } });
+      updatables.push({ update: (_dt, t) => {
+        g.rotation.y = t * 1.5;
+        glow.scale.setScalar(1 + Math.sin(t * 4) * 0.12);
+        beam.material.opacity = 0.24 + Math.sin(t * 3 + p.x) * 0.1;
+      } });
     });
   }
 
-  // --- safe-zone ring (red barrier wall) ---
+  // --- safe-zone ring (red barrier wall + crisp ground edge) ---
   const zoneWall = new THREE.Mesh(
     new THREE.CylinderGeometry(1, 1, 60, 48, 1, true),
     new THREE.MeshBasicMaterial({ color: 0xff2e2e, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
@@ -429,12 +542,23 @@ export function buildWorld(scene, layout, quality = 'med') {
   zoneRing.rotation.x = Math.PI / 2;
   zoneRing.position.y = 0.6;
   group.add(zoneRing);
+  const zoneGround = new THREE.Mesh(
+    new THREE.RingGeometry(0.965, 1.0, 72),
+    new THREE.MeshBasicMaterial({ color: 0xff3b3b, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+  zoneGround.rotation.x = -Math.PI / 2;
+  zoneGround.position.y = 0.12;
+  group.add(zoneGround);
+  updatables.push({ update: (_dt, t) => {
+    zoneWall.material.opacity = 0.2 + Math.sin(t * 3) * 0.07;
+  } });
 
   function setZone(x, z, r) {
     zoneWall.position.x = x; zoneWall.position.z = z;
     zoneWall.scale.set(r, 1, r);
     zoneRing.position.x = x; zoneRing.position.z = z;
     zoneRing.scale.set(r, r, 1);
+    zoneGround.position.x = x; zoneGround.position.z = z;
+    zoneGround.scale.set(r, r, 1);
   }
 
   function setRamen(i, visible) {

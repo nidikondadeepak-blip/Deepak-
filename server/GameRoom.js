@@ -465,7 +465,9 @@ export class GameRoom {
         this.emit({ k: 'kill', killer: null, kName: source === 'zone' ? 'BARRIER' : '???', victim: victim.id, vName: victim.name, weapon: source });
       }
     } else if (amount >= 1) {
-      this.emit({ k: 'dmg', id: victim.id, amt: Math.round(amount), hp: Math.round(victim.hp) });
+      // fx/fz = attacker position → clients draw a hit-direction indicator
+      this.emit({ k: 'dmg', id: victim.id, amt: Math.round(amount), hp: Math.round(victim.hp),
+        fx: attacker ? +attacker.x.toFixed(1) : null, fz: attacker ? +attacker.z.toFixed(1) : null });
     }
   }
 

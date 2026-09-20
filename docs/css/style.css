@@ -319,3 +319,24 @@ body {
 #toast-container { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .toast { background: rgba(20,12,12,.95); border: 2px solid var(--red); border-radius: 12px; padding: 10px 22px; font-weight: 900; animation: feedin .25s ease-out; }
 .toast.good { border-color: var(--hp); }
+
+/* ---------- Free-Fire clarity pass (v1.1) ---------- */
+/* dynamic 4-line crosshair driven by --gap / --chc custom props from game code */
+#crosshair { --gap: 7px; --chc: #ffffff; width: 36px; height: 36px; background:
+  linear-gradient(var(--chc), var(--chc)) center top / 2.5px calc(50% - var(--gap)) no-repeat,
+  linear-gradient(var(--chc), var(--chc)) center bottom / 2.5px calc(50% - var(--gap)) no-repeat,
+  linear-gradient(var(--chc), var(--chc)) left center / calc(50% - var(--gap)) 2.5px no-repeat,
+  linear-gradient(var(--chc), var(--chc)) right center / calc(50% - var(--gap)) 2.5px no-repeat;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.9)); }
+#crosshair::before, #crosshair::after { content: none; }
+#crosshair.hot { --chc: #ff3b3b; }
+#crosshair .ch-dot { left: 15px; top: 15px; width: 6px; height: 6px; background: #ff3b3b; box-shadow: 0 0 6px rgba(255,59,59,.9); }
+#hitmarker { font-size: 46px; }
+/* auto-fire toggle */
+#autofire-btn { right: 14px; bottom: 214px; opacity: .55; }
+#autofire-btn.on { opacity: 1; border-color: var(--hp); box-shadow: 0 0 14px rgba(55,224,90,.7); }
+/* off-screen enemy direction arrows */
+#edge-arrows { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.edge-arrow { position: absolute; width: 0; height: 0; margin: -14px 0 0 -11px;
+  border-left: 11px solid transparent; border-right: 11px solid transparent;
+  border-bottom: 20px solid rgba(255,45,45,.92); filter: drop-shadow(0 0 4px rgba(0,0,0,.8)); }
