@@ -1,5 +1,6 @@
 # Builds the Shinobi Arena Android APK (offline demo, Capacitor + Gradle)
 # and publishes it to the "latest" release. Triggers on every app push.
+# Signed with the committed release keystore so updates install over each other.
 name: Build Android APK
 
 on:
@@ -51,7 +52,7 @@ jobs:
           cp capacitor.config.json android/app/src/main/assets/
           ls android/app/src/main/assets/public/index.html
 
-      - name: Build debug APK
+      - name: Build release APK
         run: |
           cd android
           chmod +x gradlew
@@ -61,7 +62,7 @@ jobs:
             echo "== wrapper =="; grep distributionUrl gradle/wrapper/gradle-wrapper.properties
             echo "== settings =="; cat settings.gradle
           } > /tmp/gradle.log 2>&1
-          ./gradlew assembleDebug --no-daemon >> /tmp/gradle.log 2>&1 || {
+          ./gradlew assembleRelease --no-daemon >> /tmp/gradle.log 2>&1 || {
             echo "GRADLE FAILED - error summary:"
             grep -E "What went wrong|Caused by|FAILED|FAILURE:|Execution failed|error:" /tmp/gradle.log | head -n 20 | sed 's/^/::error::/'
             grep -A10 "What went wrong" /tmp/gradle.log | head -n 14 | sed 's/^/::error::/'
@@ -69,7 +70,7 @@ jobs:
           }
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk shinobi-arena.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk shinobi-arena.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -87,4 +88,5 @@ jobs:
             1. Download `shinobi-arena.apk` below
             2. Open it on your phone → Allow "install unknown apps" if asked → Install
             3. Play! Believe it!
+            (If an old version says "App not installed", uninstall the old one first — once — then all future updates install directly.)
           files: shinobi-arena.apk
