@@ -1,8 +1,8 @@
 // ============================================================================
 // SHINOBI ARENA — Konoha world builder. Builds the full 3D village from the
 // server's authoritative layout JSON, so visuals and collision always match.
-// v1.2 realistic pass: gradient sky dome, tiled roofs, plaster walls,
-// reflective windows, street lamps, snow-capped mountains, PBR water.
+// v1.3 GTA pass: grass tufts, rocks, bushes, curbs, crosswalks, shimmering
+// water, dust motes, wall-base grime.
 // ============================================================================
 import * as THREE from '../vendor/three/three.module.js';
 import { toon, metal } from './characters.js';
@@ -136,6 +136,12 @@ function plasterMat(tintHex) {
     }
     g.fillStyle = 'rgba(0,0,0,0.05)';
     for (let i = 0; i < 6; i++) g.fillRect(0, Math.random() * 128, 128, 1 + Math.random() * 2);
+    // grime near the wall base (canvas bottom = v0 = wall bottom)
+    const grad = g.createLinearGradient(0, 128, 0, 88);
+    grad.addColorStop(0, 'rgba(40,30,20,0.28)');
+    grad.addColorStop(1, 'rgba(40,30,20,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 88, 128, 40);
   });
   return std(t, 0.92);
 }
@@ -224,6 +230,44 @@ function skyTexture() {
     g.fillStyle = grad;
     g.fillRect(0, 0, 16, 256);
   });
+}
+
+// grass-blade sprite (alpha-cutout crossed planes)
+function grassTexture() {
+  return canvasTex('grassblade', 64, 64, (g) => {
+    g.clearRect(0, 0, 64, 64);
+    g.lineCap = 'round';
+    for (let i = 0; i < 14; i++) {
+      const x0 = 8 + Math.random() * 48;
+      const bend = (Math.random() - 0.5) * 22;
+      const h = 26 + Math.random() * 30;
+      const shade = 90 + Math.random() * 70;
+      g.strokeStyle = `rgb(${shade * 0.45},${shade},${shade * 0.5})`;
+      g.lineWidth = 3 + Math.random() * 2.5;
+      g.beginPath();
+      g.moveTo(x0, 64);
+      g.quadraticCurveTo(x0 + bend * 0.3, 64 - h * 0.6, x0 + bend, 64 - h);
+      g.stroke();
+    }
+  });
+}
+
+// soft blobs for scrolling water shimmer
+function waterTexture(key, rx, ry) {
+  const t = canvasTex('water' + key, 128, 128, (g) => {
+    g.fillStyle = '#bfe4f2';
+    g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 40; i++) {
+      const x = Math.random() * 128, y = Math.random() * 128, r = 6 + Math.random() * 18;
+      const grad = g.createRadialGradient(x, y, 1, x, y, r);
+      grad.addColorStop(0, Math.random() < 0.5 ? 'rgba(255,255,255,0.5)' : 'rgba(70,140,190,0.45)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grad;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+  });
+  t.repeat.set(rx, ry);
+  return t;
 }
 
 const glassMat = new THREE.MeshStandardMaterial({
@@ -363,6 +407,41 @@ export function buildWorld(scene, layout, quality = 'med') {
   const road2 = new THREE.Mesh(new THREE.PlaneGeometry(S, 9), std(rTex2, 0.92));
   road2.rotation.x = -Math.PI / 2; road2.position.y = 0.015; road2.receiveShadow = true;
   group.add(road2);
+
+  // curbs along both roads (split around the plaza) + crosswalks
+  {
+    const curbMat = toon(0xb8b4a8, { rough: 0.9 });
+    const segLen = S / 2 - 13;
+    for (const s of [-1, 1]) {
+      for (const e of [-1, 1]) {
+        const zc = e * (13 + segLen / 2);
+        const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.24, segLen), curbMat);
+        c1.position.set(s * 5.1, 0.12, zc);
+        c1.receiveShadow = true; c1.castShadow = true;
+        const c2 = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.24, 0.6), curbMat);
+        c2.position.set(zc, 0.12, s * 5.1);
+        c2.receiveShadow = true; c2.castShadow = true;
+        group.add(c1, c2);
+      }
+    }
+    const stripeMat = toon(0xe8e4da, { rough: 0.9 });
+    for (const zc of [-16, 16]) {
+      for (let i = 0; i < 5; i++) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.04, 2.4), stripeMat);
+        st.position.set(-3.2 + i * 1.6, 0.03, zc);
+        st.receiveShadow = true;
+        group.add(st);
+      }
+    }
+    for (const xc of [-16, 16]) {
+      for (let i = 0; i < 5; i++) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.04, 1.1), stripeMat);
+        st.position.set(xc, 0.03, -3.2 + i * 1.6);
+        st.receiveShadow = true;
+        group.add(st);
+      }
+    }
+  }
 
   // --- distant mountains (snow-capped) + clouds ---
   {
@@ -613,6 +692,106 @@ export function buildWorld(scene, layout, quality = 'med') {
     }
   }
 
+  // --- ground cover: grass tufts, rocks, bushes (instanced, 3 draw calls) ---
+  function scatterSpots(count, margin = 2) {
+    const spots = [];
+    let guard = 0;
+    while (spots.length < count && guard++ < count * 40) {
+      const x = (Math.random() - 0.5) * (S - 8);
+      const z = (Math.random() - 0.5) * (S - 8);
+      if (Math.abs(x) < 6.5 || Math.abs(z) < 6.5) continue;  // roads
+      if (Math.hypot(x, z) < 14) continue;                  // plaza
+      let bad = false;
+      for (const c of layout.colliders) {
+        if (Math.abs(x - c.x) < c.w / 2 + margin && Math.abs(z - c.z) < c.d / 2 + margin) { bad = true; break; }
+      }
+      if (bad) continue;
+      for (const d of layout.decor) {
+        if (d.type === 'lake' || d.type === 'river') {
+          const w = (d.w || 20) / 2 + margin, dd = (d.d || 20) / 2 + margin;
+          if (Math.abs(x - d.x) < w && Math.abs(z - d.z) < dd) { bad = true; break; }
+        }
+      }
+      if (bad) continue;
+      spots.push({ x, z, s: 0.7 + Math.random() * 0.7, ry: Math.random() * Math.PI });
+    }
+    return spots;
+  }
+  {
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const eul = new THREE.Euler();
+    const v3 = new THREE.Vector3();
+    const sc3 = new THREE.Vector3();
+    const tint = new THREE.Color();
+    // grass: crossed alpha-cutout planes
+    if (quality !== 'low') {
+      const spots = scatterSpots(550);
+      const gGeo = new THREE.PlaneGeometry(0.8, 0.55);
+      gGeo.translate(0, 0.27, 0);
+      const gMat = new THREE.MeshStandardMaterial({
+        map: grassTexture(), alphaTest: 0.35, side: THREE.DoubleSide, roughness: 1, metalness: 0,
+      });
+      const grass = new THREE.InstancedMesh(gGeo, gMat, spots.length * 2);
+      spots.forEach((sp, i) => {
+        for (let k = 0; k < 2; k++) {
+          eul.set(0, sp.ry + (k * Math.PI) / 2, 0);
+          q.setFromEuler(eul);
+          v3.set(sp.x, 0, sp.z);
+          sc3.set(sp.s, sp.s, sp.s);
+          m4.compose(v3, q, sc3);
+          grass.setMatrixAt(i * 2 + k, m4);
+          tint.setHSL(0.29 + Math.random() * 0.05, 0.55, 0.32 + Math.random() * 0.14);
+          grass.setColorAt(i * 2 + k, tint);
+        }
+      });
+      grass.instanceMatrix.needsUpdate = true;
+      if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+      grass.receiveShadow = true;
+      group.add(grass);
+    }
+    // rocks
+    {
+      const spots = scatterSpots(quality === 'low' ? 30 : 80, 3);
+      const rGeo = new THREE.IcosahedronGeometry(0.45, 0);
+      const rocks = new THREE.InstancedMesh(rGeo, toon(0x8a8578, { rough: 0.95 }), spots.length);
+      spots.forEach((sp, i) => {
+        eul.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        q.setFromEuler(eul);
+        v3.set(sp.x, 0.12 * sp.s, sp.z);
+        sc3.set(sp.s * (0.6 + Math.random()), sp.s * (0.5 + Math.random() * 0.6), sp.s * (0.6 + Math.random()));
+        m4.compose(v3, q, sc3);
+        rocks.setMatrixAt(i, m4);
+        tint.setHSL(0.1, 0.05 + Math.random() * 0.06, 0.42 + Math.random() * 0.16);
+        rocks.setColorAt(i, tint);
+      });
+      rocks.instanceMatrix.needsUpdate = true;
+      if (rocks.instanceColor) rocks.instanceColor.needsUpdate = true;
+      rocks.castShadow = true; rocks.receiveShadow = true;
+      group.add(rocks);
+    }
+    // bushes
+    {
+      const spots = scatterSpots(quality === 'low' ? 20 : 60, 3);
+      const bGeo = new THREE.SphereGeometry(0.7, 8, 6);
+      const bushes = new THREE.InstancedMesh(bGeo, toon(0x2f7a3d, { rough: 1 }), spots.length);
+      spots.forEach((sp, i) => {
+        eul.set(0, sp.ry, 0);
+        q.setFromEuler(eul);
+        v3.set(sp.x, 0.45 * sp.s, sp.z);
+        sc3.set(sp.s * 1.2, sp.s * 0.8, sp.s * 1.2);
+        m4.compose(v3, q, sc3);
+        bushes.setMatrixAt(i, m4);
+        tint.setHSL(0.3 + Math.random() * 0.04, 0.5, 0.26 + Math.random() * 0.1);
+        bushes.setColorAt(i, tint);
+      });
+      bushes.instanceMatrix.needsUpdate = true;
+      if (bushes.instanceColor) bushes.instanceColor.needsUpdate = true;
+      bushes.castShadow = true;
+      group.add(bushes);
+    }
+  }
+
   // --- street lamps along both roads (warm glow, no dynamic lights) ---
   {
     const poleMat = toon(0x2b2b35, { rough: 0.6, metal: 0.4 });
@@ -680,6 +859,7 @@ export function buildWorld(scene, layout, quality = 'med') {
     group.add(im);
   }
 
+  const waterTexs = [];
   for (const d of layout.decor) {
     switch (d.type) {
       case 'torii': {
@@ -726,15 +906,19 @@ export function buildWorld(scene, layout, quality = 'med') {
         break;
       }
       case 'lake': {
+        const wt = waterTexture('lake', 3, 2);
+        waterTexs.push(wt);
         const lake = new THREE.Mesh(new THREE.PlaneGeometry(d.w || 24, d.d || 18),
-          new THREE.MeshStandardMaterial({ color: 0x2fa8dd, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.9, envMapIntensity: 1.0 }));
+          new THREE.MeshStandardMaterial({ color: 0x3fa9d8, map: wt, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.92, envMapIntensity: 1.0 }));
         lake.rotation.x = -Math.PI / 2; lake.position.set(d.x, 0.05, d.z);
         group.add(lake);
         break;
       }
       case 'river': {
+        const wt = waterTexture('river', 2, 12);
+        waterTexs.push(wt);
         const river = new THREE.Mesh(new THREE.PlaneGeometry(d.w || 10, d.d || 200),
-          new THREE.MeshStandardMaterial({ color: 0x2fa8dd, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.85, envMapIntensity: 1.0 }));
+          new THREE.MeshStandardMaterial({ color: 0x3fa9d8, map: wt, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.88, envMapIntensity: 1.0 }));
         river.rotation.x = -Math.PI / 2; river.position.set(d.x, 0.04, d.z);
         group.add(river);
         break;
@@ -750,6 +934,12 @@ export function buildWorld(scene, layout, quality = 'med') {
       case 'noren': break; // built into ichiraku
       default: break;
     }
+  }
+  // scrolling water shimmer
+  if (waterTexs.length) {
+    updatables.push({ update: (dt) => {
+      for (const wt of waterTexs) { wt.offset.x += dt * 0.015; wt.offset.y += dt * 0.03; }
+    } });
   }
 
   // --- drifting leaves (signature Konoha vibe) ---
@@ -774,6 +964,38 @@ export function buildWorld(scene, layout, quality = 'med') {
           p[i * 3 + 1] += dt * Math.cos(t * 0.7 + i * 1.3) * 0.6 - dt * 0.25;
           if (p[i * 3] > half) p[i * 3] = -half;
           if (p[i * 3 + 1] < 0.3) p[i * 3 + 1] = 24;
+        }
+        g.attributes.position.needsUpdate = true;
+      },
+    });
+  }
+
+  // --- floating dust motes (sunlit air) ---
+  if (quality !== 'low') {
+    const count = quality === 'high' ? 160 : 100;
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * S * 0.7;
+      pos[i * 3 + 1] = 0.5 + Math.random() * 8;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * S * 0.7;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const dust = new THREE.Points(g, new THREE.PointsMaterial({
+      color: 0xfff2cc, size: 0.22, transparent: true, opacity: 0.5,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    group.add(dust);
+    updatables.push({
+      update: (dt, t) => {
+        const p = g.attributes.position.array;
+        for (let i = 0; i < count; i++) {
+          p[i * 3] += dt * Math.sin(t * 0.5 + i * 2.1) * 0.5;
+          p[i * 3 + 1] += dt * Math.cos(t * 0.4 + i * 1.3) * 0.25;
+          p[i * 3 + 2] += dt * 0.35;
+          if (p[i * 3 + 2] > S * 0.35) p[i * 3 + 2] = -S * 0.35;
+          if (p[i * 3 + 1] < 0.3) p[i * 3 + 1] = 8;
+          if (p[i * 3 + 1] > 9) p[i * 3 + 1] = 0.6;
         }
         g.attributes.position.needsUpdate = true;
       },

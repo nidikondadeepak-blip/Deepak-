@@ -17,6 +17,12 @@ import {
   updateHUD, drawMinimap, addFeed, announce, clearFeed, showHitmarker,
   damageFlash, spawnDamageNumber, weaponLabel, skillIcon,
 } from './ui.js';
+import { EffectComposer } from '../vendor/three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from '../vendor/three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from '../vendor/three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from '../vendor/three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from '../vendor/three/addons/postprocessing/OutputPass.js';
+import { VignetteShader } from '../vendor/three/addons/shaders/VignetteShader.js';
 
 const INPUT_HZ = 20;
 const _pv = new THREE.Vector3(); // scratch for projections
@@ -76,6 +82,26 @@ export class Game {
     this.scene = new THREE.Scene();
     this.scene.environment = makeEnvironment(this.renderer);
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
+
+    // cinematic post-processing (bloom + vignette) on med/high quality
+    this.usePost = settings.quality !== 'low';
+    if (this.usePost) {
+      this.composer = new EffectComposer(this.renderer);
+      if (this.renderer.capabilities.isWebGL2) {
+        this.composer.renderTarget1.samples = 4;
+        this.composer.renderTarget2.samples = 4;
+      }
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.composer.addPass(new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.38, 0.55, 0.82));
+      this.composer.addPass(new OutputPass());
+      const vig = new ShaderPass(VignetteShader);
+      vig.uniforms.offset.value = 1.08;
+      vig.uniforms.darkness.value = 1.18;
+      this.composer.addPass(vig);
+    } else {
+      this.composer = null;
+    }
 
     this.world = buildWorld(this.scene, layout, settings.quality);
     this.fx = new FXSystem(this.scene);
@@ -186,6 +212,7 @@ export class Game {
     if (v) { v.style.background = ''; v.style.opacity = '0'; }
     this.world.dispose();
     this.fx.dispose();
+    if (this.composer && this.composer.dispose) this.composer.dispose();
     this.renderer.dispose();
   }
 
@@ -199,6 +226,7 @@ export class Game {
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
+    if (this.composer) this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -991,6 +1019,7 @@ export class Game {
     this.updateCamera(dt, time);
     this.world.update(dt, time);
     this.fx.update(dt, time);
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 }
