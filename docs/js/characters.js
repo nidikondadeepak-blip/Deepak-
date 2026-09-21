@@ -1,10 +1,12 @@
 // ============================================================================
-// SHINOBI ARENA — cel-shaded anime ninja factory + procedural animation.
-// One rig, five flavors (hair / outfit / eyes per hero). Used by both the
-// live game and the character-select 3D preview.
+// SHINOBI ARENA — HD ninja factory + procedural animation.
+// v1.2 realistic pass: PBR skin/cloth/metal, detailed eyes, outfit trim,
+// leaf-symbol plates, wrapped handles. No cartoon outlines.
+// One rig, per-hero hair/face/outfit. Used by the game + char-select preview.
 // ============================================================================
 import * as THREE from '../vendor/three/three.module.js';
 
+// legacy export (kept for compatibility) — PBR needs no gradient map
 let gradientMap = null;
 export function getGradientMap() {
   if (gradientMap) return gradientMap;
@@ -18,36 +20,102 @@ export function getGradientMap() {
 }
 
 const matCache = new Map();
-export function toon(color) {
-  const key = color;
+export function toon(color, opts = {}) {
+  const key = color + '|' + (opts.rough ?? '') + '|' + (opts.metal ?? '');
   if (!matCache.has(key)) {
-    matCache.set(key, new THREE.MeshToonMaterial({ color, gradientMap: getGradientMap() }));
+    matCache.set(key, new THREE.MeshStandardMaterial({
+      color,
+      roughness: opts.rough ?? 0.82,
+      metalness: opts.metal ?? 0.04,
+      envMapIntensity: 0.5,
+    }));
   }
   return matCache.get(key);
 }
-const outlineMat = new THREE.MeshBasicMaterial({ color: 0x0a0a12, side: THREE.BackSide });
 
-// Add inverted-hull outline shells to every mesh so the whole ninja pops.
-function addOutlines(root) {
-  const meshes = [];
-  root.traverse((o) => { if (o.isMesh && !o.userData.noOutline) meshes.push(o); });
-  for (const m of meshes) {
-    const shell = new THREE.Mesh(m.geometry, outlineMat);
-    shell.scale.setScalar(1.07);
-    shell.raycast = () => {};
-    m.add(shell);
+const metalCache = new Map();
+export function metal(color, rough = 0.3) {
+  const key = color + '|' + rough;
+  if (!metalCache.has(key)) {
+    metalCache.set(key, new THREE.MeshStandardMaterial({
+      color, metalness: 0.9, roughness: rough, envMapIntensity: 1.15,
+    }));
   }
+  return metalCache.get(key);
+}
+
+const skinCache = new Map();
+export function skin(color) {
+  if (!skinCache.has(color)) {
+    skinCache.set(color, new THREE.MeshStandardMaterial({
+      color, roughness: 0.55, metalness: 0.0,
+      emissive: color, emissiveIntensity: 0.07, envMapIntensity: 0.35,
+    }));
+  }
+  return skinCache.get(color);
 }
 
 function mesh(geo, color, x = 0, y = 0, z = 0, opts = {}) {
-  const m = new THREE.Mesh(geo, opts.mat || toon(color));
+  const m = new THREE.Mesh(geo, opts.mat || toon(color, opts));
   m.position.set(x, y, z);
   if (opts.ry) m.rotation.y = opts.ry;
   if (opts.rz) m.rotation.z = opts.rz;
   if (opts.rx) m.rotation.x = opts.rx;
   m.castShadow = true;
-  if (opts.noOutline) m.userData.noOutline = true;
   return m;
+}
+
+// --- leaf-village spiral symbol (headband plates) ---
+let leafTex = null;
+function getLeafTex() {
+  if (leafTex) return leafTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 64, 64);
+  g.strokeStyle = '#1e3a5f';
+  g.lineWidth = 6;
+  g.lineCap = 'round';
+  // spiral swirl
+  g.beginPath();
+  for (let a = 0; a < Math.PI * 4.2; a += 0.1) {
+    const r = 4 + a * 2.1;
+    const x = 32 + Math.cos(a + 1.2) * r, y = 32 + Math.sin(a + 1.2) * r;
+    if (a === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.stroke();
+  // leaf tail
+  g.beginPath();
+  g.moveTo(32, 8); g.quadraticCurveTo(44, 20, 40, 34);
+  g.stroke();
+  leafTex = new THREE.CanvasTexture(c);
+  leafTex.colorSpace = THREE.SRGBColorSpace;
+  return leafTex;
+}
+
+// --- explosive-tag seal texture ---
+let sealTex = null;
+function getSealTex() {
+  if (sealTex) return sealTex;
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 96;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f5ecd8';
+  g.fillRect(0, 0, 64, 96);
+  g.strokeStyle = '#c0272d';
+  g.lineWidth = 4;
+  g.strokeRect(5, 5, 54, 86);
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(32, 16); g.lineTo(32, 80);
+  g.moveTo(16, 34); g.lineTo(48, 34);
+  g.moveTo(20, 58); g.lineTo(44, 52);
+  g.stroke();
+  g.fillStyle = '#c0272d';
+  g.beginPath(); g.arc(32, 72, 5, 0, Math.PI * 2); g.fill();
+  sealTex = new THREE.CanvasTexture(c);
+  sealTex.colorSpace = THREE.SRGBColorSpace;
+  return sealTex;
 }
 
 // --- per-hero hair styles ---
@@ -77,7 +145,7 @@ function buildHair(charId, colors, head) {
   } else if (charId === 'lee') {
     g.add(mesh(new THREE.SphereGeometry(0.225, 14, 10, 0, Math.PI * 2, 0, 1.75), H, 0, 0.06, -0.01));
     g.add(mesh(new THREE.CylinderGeometry(0.225, 0.215, 0.08, 14), H, 0, 0.1, -0.01));
-  } else if (charId === 'hinata') {
+  } else if (charId === 'hinata' || charId === 'neji') {
     g.add(mesh(new THREE.SphereGeometry(0.215, 12, 10, 0, Math.PI * 2, 0, 2.1), H, 0, 0.06, -0.02));
     g.add(mesh(new THREE.BoxGeometry(0.09, 0.5, 0.1), H, -0.2, -0.2, -0.02)); // hime sidelocks
     g.add(mesh(new THREE.BoxGeometry(0.09, 0.5, 0.1), H, 0.2, -0.2, -0.02));
@@ -92,79 +160,102 @@ function buildHair(charId, colors, head) {
   return g;
 }
 
+const EYE_COLORS = {
+  naruto: 0x2e6bff, sasuke: 0x14141c, sakura: 0x2e8f4d,
+  lee: 0x1a1a1a, hinata: null, neji: null, kakashi: 0x1a1a1a,
+};
+
 function buildFace(charId, colors, head) {
-  // eyes
-  if (charId === 'hinata') {
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xf4f6ff });
-    for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMat);
-      e.position.set(s * 0.085, 0.0, 0.185);
-      e.userData.noOutline = true;
-      head.add(e);
-    }
-  } else {
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x101018 });
-    for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), eyeMat);
-      e.position.set(s * 0.08, 0.0, 0.19);
-      e.scale.z = 0.5;
-      e.userData.noOutline = true;
-      head.add(e);
-    }
+  const S = colors.skin;
+  const pupilColor = EYE_COLORS[charId] ?? 0x1a1a1a;
+  // eye whites + pupils (hyuga get pale pupil-less eyes)
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8f8f2, roughness: 0.35 });
+  const pupilMat = new THREE.MeshStandardMaterial({
+    color: pupilColor == null ? 0xd8dce8 : pupilColor, roughness: 0.25,
+  });
+  for (const s of [-1, 1]) {
+    const white = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), whiteMat);
+    white.position.set(s * 0.085, 0.005, 0.175);
+    white.scale.z = 0.55;
+    head.add(white);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(pupilColor == null ? 0.036 : 0.022, 8, 8), pupilMat);
+    pupil.position.set(s * 0.085, 0.005, 0.196);
+    pupil.scale.z = 0.5;
+    head.add(pupil);
   }
-  // whiskers for naruto, thick brows for lee
+  // eyebrows
+  const browMat = new THREE.MeshStandardMaterial({ color: colors.hair, roughness: 0.8 });
+  for (const s of [-1, 1]) {
+    const b = new THREE.Mesh(
+      new THREE.BoxGeometry(charId === 'lee' ? 0.1 : 0.08, charId === 'lee' ? 0.032 : 0.02, 0.02), browMat);
+    b.position.set(s * 0.085, 0.082, 0.188);
+    b.rotation.z = -s * 0.22;
+    head.add(b);
+  }
+  // mouth + nose hint
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.012, 0.012),
+    new THREE.MeshStandardMaterial({ color: 0x6e3a2e, roughness: 0.7 }));
+  mouth.position.set(0, -0.088, 0.196);
+  head.add(mouth);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.04, 0.02), skin(S));
+  nose.position.set(0, -0.03, 0.203);
+  head.add(nose);
+  // whiskers for naruto
   if (charId === 'naruto') {
     const wMat = new THREE.MeshBasicMaterial({ color: 0x8a5a2a });
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
       const w = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.008), wMat);
       w.position.set(s * 0.17, -0.03 + i * 0.03, 0.14);
-      w.userData.noOutline = true;
       head.add(w);
     }
   }
-  if (charId === 'lee') {
-    const bMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
-    for (const s of [-1, 1]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.03, 0.02), bMat);
-      b.position.set(s * 0.08, 0.07, 0.185);
-      b.userData.noOutline = true;
-      head.add(b);
-    }
-  }
-  // leaf headband plate
-  const band = mesh(new THREE.BoxGeometry(0.3, 0.12, 0.02),
-    colors.headband, 0, 0.1, 0.185, { noOutline: true });
+  // forehead protector: cloth band + engraved metal plate
+  const band = mesh(new THREE.CylinderGeometry(0.218, 0.218, 0.11, 16, 1, true),
+    colors.headband, 0, 0.1, 0, { rough: 0.9 });
+  band.material = band.material.clone();
+  band.material.side = THREE.DoubleSide;
   head.add(band);
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.015),
-    new THREE.MeshToonMaterial({ color: 0xb9c2cc, gradientMap: getGradientMap(), metalness: 0.4, roughness: 0.4 }));
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 0.03), metal(0xb9c2cc, 0.35));
   plate.position.set(0, 0.1, 0.2);
-  plate.userData.noOutline = true;
+  plate.castShadow = true;
   head.add(plate);
+  const symbol = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 0.11),
+    new THREE.MeshBasicMaterial({ map: getLeafTex(), transparent: true }));
+  symbol.position.set(0, 0.1, 0.216);
+  head.add(symbol);
 }
 
-// small hand-held weapon props
+// small hand-held weapon props (real metal + wrapped grips)
 function buildWeaponProp(kind) {
   const g = new THREE.Group();
-  const steel = 0xc8d2dc, dark = 0x3a3f4a;
+  const steel = metal(0xc8d2dc, 0.25);
   if (kind === 'kunai') {
-    g.add(mesh(new THREE.ConeGeometry(0.045, 0.22, 4), steel, 0, 0.1, 0));
-    g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 6), dark, 0, -0.06, 0));
-    g.add(mesh(new THREE.TorusGeometry(0.045, 0.012, 6, 12), dark, 0, -0.15, 0));
+    g.add(mesh(new THREE.ConeGeometry(0.045, 0.22, 4), 0, 0, 0.1, 0, { mat: steel }));
+    g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 6), 0x2a2a35, 0, -0.06, 0, { rough: 0.9 }));
+    for (let i = 0; i < 3; i++) {
+      const wrap = mesh(new THREE.TorusGeometry(0.021, 0.008, 6, 10), 0x8e2f2f, 0, -0.03 - i * 0.035, 0);
+      wrap.rotation.x = Math.PI / 2;
+      g.add(wrap);
+    }
+    g.add(mesh(new THREE.TorusGeometry(0.045, 0.012, 6, 12), 0, 0, -0.15, 0, { mat: steel }));
   } else if (kind === 'shuriken') {
     for (let i = 0; i < 4; i++) {
-      const blade = mesh(new THREE.ConeGeometry(0.05, 0.16, 4), steel, 0, 0, 0);
+      const blade = mesh(new THREE.ConeGeometry(0.05, 0.16, 4), 0, 0, 0, 0, { mat: steel });
       blade.rotation.z = (i * Math.PI) / 2;
       blade.position.set(Math.cos((i * Math.PI) / 2) * 0.07, Math.sin((i * Math.PI) / 2) * 0.07, 0);
       blade.rotation.y = Math.PI / 2;
       g.add(blade);
     }
-    g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 8), dark, 0, 0, 0, { rx: Math.PI / 2 }));
+    g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 8), 0x3a3f4a, 0, 0, 0, { rx: Math.PI / 2 }));
     g.rotation.x = Math.PI / 2;
-  } else { // bomb = kunai + paper tag
-    g.add(mesh(new THREE.ConeGeometry(0.045, 0.22, 4), steel, 0, 0.1, 0));
-    g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 6), dark, 0, -0.06, 0));
-    const tag = mesh(new THREE.BoxGeometry(0.12, 0.2, 0.01), 0xf5ecd8, 0.08, -0.1, 0, { noOutline: true });
+  } else { // bomb = kunai + paper seal tag
+    g.add(mesh(new THREE.ConeGeometry(0.045, 0.22, 4), 0, 0, 0.1, 0, { mat: steel }));
+    g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 6), 0x2a2a35, 0, -0.06, 0, { rough: 0.9 }));
+    const tag = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.01),
+      new THREE.MeshStandardMaterial({ map: getSealTex(), roughness: 0.9 }));
+    tag.position.set(0.08, -0.1, 0);
     tag.rotation.z = 0.4;
+    tag.castShadow = true;
     g.add(tag);
   }
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -225,8 +316,10 @@ export function createNinjaMesh(charId, colors) {
     const pivot = new THREE.Group();
     pivot.position.set(s * 0.13, 0.95, 0);
     const leg = mesh(new THREE.CapsuleGeometry(0.11, 0.62, 4, 10), P, 0, -0.42, 0);
-    const sandal = mesh(new THREE.BoxGeometry(0.2, 0.1, 0.34), 0x2a2a35, 0, -0.85, 0.05);
-    pivot.add(leg, sandal);
+    const wrap = mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.1, 10), A, 0, -0.62, 0); // shin wrap
+    const sandal = mesh(new THREE.BoxGeometry(0.2, 0.1, 0.34), 0x2a2a35, 0, -0.85, 0.05, { rough: 0.9 });
+    const strap = mesh(new THREE.BoxGeometry(0.21, 0.03, 0.08), A, 0, -0.8, 0.08);
+    pivot.add(leg, wrap, sandal, strap);
     root.add(pivot);
     parts['leg' + side] = pivot;
   }
@@ -235,10 +328,19 @@ export function createNinjaMesh(charId, colors) {
   hips.position.y = 0.95;
   root.add(hips);
   parts.hips = hips;
-  const torso = mesh(new THREE.CapsuleGeometry(0.24, 0.42, 6, 12), O, 0, 0.42, 0);
-  const belt = mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.1, 12), A, 0, 0.12, 0);
-  hips.add(torso, belt);
-  if (charId === 'lee') { // orange leg warmers vibe -> belt wraps
+  const torso = mesh(new THREE.CapsuleGeometry(0.24, 0.42, 6, 12), O, 0, 0.42, 0, { rough: 0.85 });
+  const hem = mesh(new THREE.CylinderGeometry(0.24, 0.29, 0.2, 12, 1, true), O, 0, 0.02, 0, { rough: 0.85 });
+  hem.material = hem.material.clone();
+  hem.material.side = THREE.DoubleSide;
+  const belt = mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.1, 12), A, 0, 0.12, 0, { rough: 0.7 });
+  const buckle = mesh(new THREE.BoxGeometry(0.1, 0.07, 0.04), 0, 0, 0.14, 0.24, { mat: metal(0xd8b84a, 0.35) });
+  const pouch = mesh(new THREE.BoxGeometry(0.12, 0.12, 0.07), 0x4a3a28, 0.2, 0.1, 0.16, { rough: 0.9 });
+  hips.add(torso, hem, belt, buckle, pouch);
+  // shoulder pads
+  for (const s of [-1, 1]) {
+    hips.add(mesh(new THREE.SphereGeometry(0.11, 10, 8), O, s * 0.33, 0.62, 0));
+  }
+  if (charId === 'lee') { // orange belt wraps
     hips.add(mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.06, 12), 0xff5a3c, 0, 0.2, 0));
   }
 
@@ -247,9 +349,10 @@ export function createNinjaMesh(charId, colors) {
     const s = side === 'L' ? -1 : 1;
     const pivot = new THREE.Group();
     pivot.position.set(s * 0.33, 0.62, 0);
-    const arm = mesh(new THREE.CapsuleGeometry(0.09, 0.44, 4, 10), O, 0, -0.3, 0);
-    const hand = mesh(new THREE.SphereGeometry(0.095, 10, 8), S, 0, -0.58, 0);
-    pivot.add(arm, hand);
+    const arm = mesh(new THREE.CapsuleGeometry(0.09, 0.44, 4, 10), O, 0, -0.3, 0, { rough: 0.85 });
+    const wrist = mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.09, 10), A, 0, -0.46, 0);
+    const hand = mesh(new THREE.SphereGeometry(0.095, 10, 8), S, 0, -0.58, 0, { mat: skin(S) });
+    pivot.add(arm, wrist, hand);
     hips.add(pivot);
     parts['arm' + side] = pivot;
   }
@@ -270,21 +373,18 @@ export function createNinjaMesh(charId, colors) {
   neck.position.y = 0.78;
   hips.add(neck);
   parts.neck = neck;
+  const collar = mesh(new THREE.CylinderGeometry(0.155, 0.2, 0.15, 12, 1, true), O, 0, 0.0, 0, { rough: 0.85 });
+  collar.material = collar.material.clone();
+  collar.material.side = THREE.DoubleSide;
+  neck.add(collar);
   const head = new THREE.Group();
   head.position.y = 0.24;
-  const skull = mesh(new THREE.SphereGeometry(0.21, 16, 14), S, 0, 0, 0);
+  const skull = mesh(new THREE.SphereGeometry(0.21, 18, 14), S, 0, 0, 0, { mat: skin(S) });
   head.add(skull);
   buildHair(charId, colors, head);
   buildFace(charId, colors, head);
   neck.add(head);
   parts.head = head;
-
-  // jacket collar for sasuke / naruto pop
-  if (charId === 'sasuke' || charId === 'naruto') {
-    neck.add(mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.16, 10, 1, true), O, 0, 0.02, 0));
-  }
-
-  addOutlines(root);
 
   // nameplate
   const plate = makePlate();
@@ -339,6 +439,7 @@ export function animateNinja(ninja, state, dt, time) {
   } else {
     p.armL.rotation.x = -sw * 0.6 * runAmp + (state.airborne ? -0.9 : Math.sin(time * 2) * 0.05);
     p.armR.rotation.x = sw * 0.6 * runAmp + (state.airborne ? -0.9 : Math.sin(time * 2 + 1) * 0.05);
+    ninja.root.rotation.x = runAmp * 0.13; // lean into the sprint
   }
   if (ninja.spinT > 0) {
     ninja.spinT -= dt;
@@ -348,4 +449,7 @@ export function animateNinja(ninja, state, dt, time) {
   p.hips.position.y = 0.95 + Math.abs(Math.cos(ninja.walkPhase)) * 0.07 * runAmp + (state.airborne ? 0.05 : Math.sin(time * 2.2) * 0.015);
   // head look
   p.neck.rotation.x = THREE.MathUtils.clamp(-(state.pitch || 0) * 0.5, -0.4, 0.4);
+  // breathing: subtle torso scale
+  const br = 1 + Math.sin(time * 2.2) * 0.012 * (1 - runAmp);
+  p.hips.scale.set(br, 1, br);
 }

@@ -21,6 +21,36 @@ import {
 const INPUT_HZ = 20;
 const _pv = new THREE.Vector3(); // scratch for projections
 
+// Procedural mini-environment for PBR sheen (no external HDR needed):
+// blue sky dome + bright sun card + warm ground bounce, baked to a PMREM.
+function makeEnvironment(renderer) {
+  const env = new THREE.Scene();
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 64);
+  grad.addColorStop(0, '#2a68d8');
+  grad.addColorStop(0.55, '#9cc4ee');
+  grad.addColorStop(0.62, '#e8ddc0');
+  grad.addColorStop(1, '#4a4438');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 64);
+  const skyTex = new THREE.CanvasTexture(c);
+  skyTex.colorSpace = THREE.SRGBColorSpace;
+  env.add(new THREE.Mesh(
+    new THREE.SphereGeometry(50, 16, 12),
+    new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide })
+  ));
+  const sunCard = new THREE.Mesh(new THREE.SphereGeometry(6, 12, 10),
+    new THREE.MeshBasicMaterial({ color: 0xfff4dc }));
+  sunCard.position.set(18, 30, 9);
+  env.add(sunCard);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const rt = pmrem.fromScene(env, 0.05);
+  pmrem.dispose();
+  return rt.texture;
+}
+
 function aimStore() {
   try { return localStorage.getItem('shinobi:autofire'); }
   catch { return null; }
@@ -40,10 +70,11 @@ export class Game {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality !== 'low' });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.shadowMap.enabled = settings.quality !== 'low';
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; // filmic 3D depth
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.06;
     this.scene = new THREE.Scene();
+    this.scene.environment = makeEnvironment(this.renderer);
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
 
     this.world = buildWorld(this.scene, layout, settings.quality);
