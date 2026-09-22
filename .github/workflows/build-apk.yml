@@ -15,6 +15,11 @@ on:
       - 'package.json'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
+    inputs:
+      direct_apk:
+        description: 'Also commit APK into direct/ for in-chat delivery (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   build:
@@ -90,3 +95,14 @@ jobs:
             3. Play! Believe it!
             (If an old version says "App not installed", uninstall the old one first — once — then all future updates install directly.)
           files: shinobi-arena.apk
+
+      - name: Commit direct APK into repo (on demand)
+        if: ${{ inputs.direct_apk == 'true' }}
+        run: |
+          git config user.name "arena-bot"
+          git config user.email "arena-bot@example.com"
+          mkdir -p direct
+          cp shinobi-arena.apk direct/shinobi-arena.apk
+          git add -f direct/shinobi-arena.apk
+          git commit -m "direct APK (on-demand delivery) [skip ci]" || echo "no changes to commit"
+          git push origin HEAD:${{ github.ref_name }}
