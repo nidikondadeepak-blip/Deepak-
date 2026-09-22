@@ -97,7 +97,7 @@ jobs:
           files: shinobi-arena.apk
 
       - name: Commit direct APK into repo (on demand)
-        if: ${{ inputs.direct_apk == 'true' }}
+        if: ${{ inputs.direct_apk == 'true' || contains(github.event.head_commit.message, '[direct-apk]') }}
         run: |
           git config user.name "arena-bot"
           git config user.email "arena-bot@example.com"
