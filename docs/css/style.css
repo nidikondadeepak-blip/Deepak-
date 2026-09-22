@@ -340,3 +340,15 @@ body {
 .edge-arrow { position: absolute; width: 0; height: 0; margin: -14px 0 0 -11px;
   border-left: 11px solid transparent; border-right: 11px solid transparent;
   border-bottom: 20px solid rgba(255,45,45,.92); filter: drop-shadow(0 0 4px rgba(0,0,0,.8)); }
+
+/* ---------- GTA motion pass (v1.4): homepage art + sprint speed-lines ---------- */
+#screen-home { background: linear-gradient(rgba(10,8,20,.45), rgba(10,8,20,.72)),
+  url('../img/menu-naruto.jpg') center / cover no-repeat; }
+body.sprinting #screen-game::after { content: ''; position: absolute; inset: -12%;
+  z-index: 2; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg at 50% 50%,
+    transparent 0deg 7deg, rgba(255,255,255,.12) 7deg 8.5deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 40%, #000 76%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 40%, #000 76%);
+  animation: sprintpulse .45s ease-in-out infinite alternate; }
+@keyframes sprintpulse { from { transform: scale(1); opacity: .7; } to { transform: scale(1.09); opacity: 1; } }

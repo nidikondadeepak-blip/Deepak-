@@ -143,6 +143,12 @@ export class Game {
     this._edgeBox = null;
     this._edgePool = null;
 
+    // motion-graphics feel state
+    this.timeScale = 1;
+    this.hitstopT = 0;
+    this.stepT = 0;
+    this.introDone = false;
+
     this._boundLoop = this.loop.bind(this);
     this._last = performance.now();
     this._inputTimer = 0;
@@ -707,6 +713,7 @@ export class Game {
       case 'killConfirm': {
         if (isMe) {
           sfx.kill();
+          this.hitstopT = 0.16; // freeze-frame punch
           const kc = document.getElementById('kill-confirm');
           kc.classList.remove('hidden');
           clearTimeout(kc._t);
@@ -852,7 +859,16 @@ export class Game {
     clearInterval(this._inputTimer);
     if (document.pointerLockElement) document.exitPointerLock();
     const won = result.winner && result.winner.id === this.meId;
-    if (won) sfx.victory(); else sfx.defeat();
+    if (won) {
+      sfx.victory();
+      const me = this.players.get(this.meId);
+      if (me) {
+        const cp = new THREE.Vector3(me.rx, me.ry + 1.5, me.rz);
+        const cols = [[1, 0.82, 0.24], [0.2, 0.7, 1], [1, 0.3, 0.5], [0.3, 1, 0.4]];
+        cols.forEach((c, i) => setTimeout(() =>
+          this.fx.burst(cp, { count: 30, color: c, speed: 9, life: 1.3, grav: 5, up: 8 }), i * 220));
+      }
+    } else sfx.defeat();
     setTimeout(() => this.onMatchEnd(result), 1200);
   }
 
@@ -952,9 +968,25 @@ export class Game {
   // ----------------------------------------------------------------- loop
   loop(now) {
     this._raf = requestAnimationFrame(this._boundLoop);
-    const dt = Math.min(0.05, (now - this._last) / 1000);
+    let dt = Math.min(0.05, (now - this._last) / 1000);
     this._last = now;
     const time = now / 1000;
+
+    // hitstop: freeze-frame punch on kills, then ease back to full speed
+    if (this.hitstopT > 0) {
+      this.hitstopT -= dt;
+      this.timeScale += (0.12 - this.timeScale) * 0.6;
+    } else {
+      this.timeScale += (1 - this.timeScale) * 0.25;
+      if (this.timeScale > 0.99) this.timeScale = 1;
+    }
+    dt *= this.timeScale;
+
+    // match-intro dolly: camera dives from the sky to your ninja
+    if (this.started && !this.introDone) {
+      this.introDone = true;
+      this.camDist = 13;
+    }
 
     // crosshair hotspot (once per frame, shared by crosshair + auto-fire)
     this._hot = this.findAimTarget(0.06, 55);
@@ -967,6 +999,18 @@ export class Game {
       if (this.hotTime > 0.14) this.tryFire();
     } else {
       this.hotTime = 0;
+    }
+
+    // sprint feel: speed lines + footstep dust
+    const sprinting = !this.dead && !this.matchOver && this.sprintHeld() && this.moveHeld();
+    document.body.classList.toggle('sprinting', sprinting);
+    if (sprinting && this.snap) {
+      this.stepT -= dt;
+      if (this.stepT <= 0) {
+        this.stepT = 0.26;
+        const me = this.players.get(this.meId);
+        if (me) this.fx.landPuff(new THREE.Vector3(me.rx, me.ry + 0.1, me.rz));
+      }
     }
 
     // interpolate players toward latest snapshot (+45ms extrapolation)
