@@ -1,0 +1,35 @@
+plugins { id "com.android.application" }
+
+android {
+    namespace "com.konoha.leaf"
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.konoha.leaf"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+    sourceSets {
+        main.assets.srcDirs += ["src/main/assets"]
+    }
+}
+
+task copyWeb(type: Copy) {
+    from("../..") {
+        include "index.html", "game.js", "style.css", "manifest.webmanifest"
+    }
+    into "src/main/assets/www"
+}
+preBuild.dependsOn copyWeb
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "androidx.webkit:webkit:1.11.0"
+}

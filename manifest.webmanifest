@@ -1,0 +1,9 @@
+{
+  "name": "Konoha: Shadow of the Leaf",
+  "short_name": "Konoha",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "background_color": "#05070c",
+  "theme_color": "#0b1620",
+  "orientation": "landscape"
+}
