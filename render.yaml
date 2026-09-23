@@ -1,0 +1,11 @@
+# One-click deploy for https://render.com (free tier works fine)
+services:
+  - type: web
+    name: shinobi-arena
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000

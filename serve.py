@@ -8,7 +8,10 @@ os.chdir(ROOT)
 class H(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "*")
         self.send_header("Cache-Control", "no-store")
+        # allow Arena / phone iframes
+        self.send_header("Content-Security-Policy", "frame-ancestors *")
         SimpleHTTPRequestHandler.end_headers(self)
 
     def log_message(self, fmt, *args):
