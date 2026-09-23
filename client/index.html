@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Shinobi Arena — Naruto 3D Battle Royale</title>
+<meta name="theme-color" content="#14121f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/style.css">
+<script src="socket.io/socket.io.js"></script>
+</head>
+<body>
+<!-- floating leaves backdrop -->
+<canvas id="bg-leaves"></canvas>
+
+<!-- ======================= LOADING ======================= -->
+<div id="loading" class="overlay">
+  <div class="loader-box">
+    <div class="loader-swirl"></div>
+    <h2>Summoning the Nine-Tails…</h2>
+    <p id="loading-msg">Loading config…</p>
+    <p class="loader-ver">Shinobi Arena · app v1.4.0</p>
+  </div>
+</div>
+
+<!-- ======================= HOME ======================= -->
+<section id="screen-home" class="screen active">
+  <div class="home-inner">
+    <div class="logo-block">
+      <div class="logo-leaf">🍃</div>
+      <h1 class="game-logo"><span class="logo-red">SHINOBI</span> ARENA</h1>
+      <p class="tagline">Naruto-universe 3D Battle Royale · 200 HP · Ninja weapons only</p>
+    </div>
+
+    <div class="home-grid">
+      <!-- profile card -->
+      <div class="card profile-card">
+        <div class="profile-top">
+          <div id="profile-avatar" class="avatar">N</div>
+          <div>
+            <input id="profile-name" maxlength="16" placeholder="Your ninja name" value="Genin">
+            <div id="profile-char" class="profile-char">Naruto Uzumaki</div>
+          </div>
+        </div>
+        <div id="profile-stats" class="profile-stats">
+          <div><b id="st-level">1</b><span>LEVEL</span></div>
+          <div><b id="st-matches">0</b><span>MATCHES</span></div>
+          <div><b id="st-wins">0</b><span>WINS</span></div>
+          <div><b id="st-kills">0</b><span>KILLS</span></div>
+        </div>
+        <div class="xp-bar"><div id="xp-fill"></div></div>
+      </div>
+
+      <!-- play card -->
+      <div class="card play-card">
+        <div class="mode-toggle">
+          <button id="mode-solo" class="mode-btn active">⚔ SOLO</button>
+          <button id="mode-squad" class="mode-btn">🛡 SQUAD</button>
+        </div>
+        <button id="btn-quickplay" class="btn btn-play">▶&nbsp; PLAY <small>quick battle vs 7 ninjas</small></button>
+        <div class="home-map-row">
+          <span>MAP: <b id="home-map-label">Hidden Leaf Village</b></span>
+          <button id="btn-home-maps" class="btn btn-small">Change</button>
+        </div>
+        <div class="room-row">
+          <button id="btn-create" class="btn btn-secondary">＋ Create Room</button>
+          <div class="join-box">
+            <input id="join-code" maxlength="5" placeholder="CODE" autocapitalize="characters">
+            <button id="btn-join" class="btn btn-secondary">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- menu card -->
+      <div class="card menu-card">
+        <h3>MAIN MENU</h3>
+        <button id="btn-characters" class="btn btn-menu">🥷 Characters <small>5 heroes · 200 HP each</small></button>
+        <button id="btn-maps" class="btn btn-menu">🗺 Maps <small>Konoha · Training Grounds</small></button>
+        <button id="btn-howto" class="btn btn-menu">📜 How to Play <small>controls &amp; jutsu guide</small></button>
+        <button id="btn-settings" class="btn btn-menu">⚙ Settings <small>sensitivity · sound · quality</small></button>
+      </div>
+    </div>
+    <footer class="home-footer">Fan-made parody inspired by Naruto · Kunai · Shuriken · Paper Bombs — <b>NO GUNS</b> · v1.0</footer>
+  </div>
+</section>
+
+<!-- ======================= CHARACTERS ======================= -->
+<section id="screen-characters" class="screen">
+  <div class="subpage">
+    <header class="page-head">
+      <button id="btn-char-back" class="btn btn-back">← Back</button>
+      <h2>CHOOSE YOUR NINJA</h2>
+      <div class="hp-badge">❤ Every ninja: 200 HP</div>
+    </header>
+    <div class="char-layout">
+      <div class="char-preview card">
+        <canvas id="preview-canvas"></canvas>
+        <div class="preview-hint">⟲ drag to rotate</div>
+        <div class="preview-arrows">
+          <button id="char-prev">◀</button>
+          <button id="char-next">▶</button>
+        </div>
+      </div>
+      <div class="char-info card">
+        <h3 id="char-name">Naruto Uzumaki</h3>
+        <p id="char-title" class="char-title">The Number One Hyperactive Ninja</p>
+        <p id="char-quote" class="char-quote">"Believe it!"</p>
+        <p id="char-desc" class="char-desc"></p>
+        <div class="stat-row"><span>HP</span><div class="stat-bar hp"><div id="char-hp-fill"></div></div><b id="char-hp-text">200</b></div>
+        <div class="stat-row"><span>SPEED</span><div class="stat-bar speed"><div id="char-speed-fill"></div></div><b id="char-speed-text"></b></div>
+        <div class="stat-row"><span>DIFFICULTY</span><div id="char-diff" class="diff-pips"></div></div>
+        <div class="skill-card">
+          <div class="skill-icon" id="char-skill-icon">🌀</div>
+          <div>
+            <h4 id="skill-name">Rasengan</h4>
+            <p id="skill-desc"></p>
+            <p class="skill-meta"><span id="skill-cd"></span> · <span id="skill-chakra"></span></p>
+          </div>
+        </div>
+        <button id="btn-select-char" class="btn btn-play">SELECT NINJA</button>
+      </div>
+    </div>
+    <div id="char-cards" class="char-cards"></div>
+  </div>
+</section>
+
+<!-- ======================= MAPS ======================= -->
+<section id="screen-maps" class="screen">
+  <div class="subpage">
+    <header class="page-head">
+      <button id="btn-maps-back" class="btn btn-back">← Back</button>
+      <h2>SELECT BATTLEFIELD</h2>
+      <div></div>
+    </header>
+    <div id="map-cards" class="map-cards"></div>
+  </div>
+</section>
+
+<!-- ======================= LOBBY ======================= -->
+<section id="screen-lobby" class="screen">
+  <div class="subpage lobby-wrap">
+    <header class="page-head">
+      <button id="btn-leave" class="btn btn-back">← Leave</button>
+      <h2>BATTLE LOBBY</h2>
+      <div></div>
+    </header>
+    <div class="lobby-grid">
+      <div class="card lobby-main">
+        <div class="lobby-code-row">
+          <div>
+            <span class="lbl">ROOM CODE</span>
+            <div id="lobby-code" class="lobby-code">-----</div>
+          </div>
+          <div>
+            <span class="lbl">MAP</span>
+            <div id="lobby-map" class="lobby-meta">Hidden Leaf Village</div>
+          </div>
+          <div>
+            <span class="lbl">MODE</span>
+            <div id="lobby-mode" class="lobby-meta">SOLO</div>
+          </div>
+        </div>
+        <div id="lobby-countdown" class="lobby-countdown hidden">5</div>
+        <p id="lobby-hint" class="lobby-hint">Share the code with friends. Host starts the match.</p>
+        <div class="lobby-btns">
+          <button id="btn-ready" class="btn btn-secondary">✓ Ready</button>
+          <button id="btn-addbot" class="btn btn-secondary">＋ Add Bot</button>
+          <button id="btn-start" class="btn btn-play">START BATTLE</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>NINJAS (<span id="lobby-count">1</span>/12)</h3>
+        <div id="lobby-players" class="lobby-players"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= GAME ======================= -->
+<section id="screen-game" class="screen">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"><div class="ch-dot"></div></div>
+    <div id="hitmarker">✕</div>
+    <div id="dmg-vignette"></div>
+    <div id="byakugan-tint"></div>
+
+    <div class="hud-top">
+      <div class="hud-pill">⏱ <span id="match-timer">8:00</span></div>
+      <div class="hud-pill danger" id="zone-pill">⛩ <span id="zone-label">Barrier shrinks in</span> <span id="zone-timer">30</span>s</div>
+      <div class="hud-pill">🥷 Alive: <b id="alive-count">8</b></div>
+      <div class="hud-pill">💀 Kills: <b id="kills-count">0</b></div>
+    </div>
+
+    <div id="announce" class="hidden"><div id="announce-text"></div><div id="announce-sub"></div></div>
+    <div id="killfeed"></div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+
+    <div class="hud-bottom">
+      <div class="vitals">
+        <div class="hp-row">
+          <div class="hp-bar"><div id="hud-hp-fill"></div><span id="hud-hp-text">200 / 200</span></div>
+        </div>
+        <div class="chakra-bar"><div id="hud-chakra-fill"></div><span>CHAKRA</span></div>
+        <div id="buffs"></div>
+      </div>
+      <div class="loadout">
+        <div class="wslot" data-w="kunai"><b>1</b><span class="wicon">🗡</span><span class="wname">Kunai</span></div>
+        <div class="wslot" data-w="shuriken"><b>2</b><span class="wicon">✴</span><span class="wname">Shuriken</span></div>
+        <div class="wslot" data-w="bomb"><b>3</b><span class="wicon">💥</span><span class="wname">Paper Bomb</span></div>
+        <div id="skill-slot"><b>Q</b><span id="skill-slot-icon">🌀</span><span id="skill-slot-name">Rasengan</span><div id="skill-cd-overlay"></div></div>
+      </div>
+    </div>
+
+    <div id="kill-confirm" class="hidden">ELIMINATED <span id="kill-confirm-name"></span></div>
+    <div id="spectate-bar" class="hidden">☠ You were eliminated — spectating <b id="spectate-name"></b> · <button id="btn-spectate-next" class="btn btn-small">Next</button></div>
+    <div id="controls-hint">WASD move · Mouse aim · LMB throw · 1/2/3 weapons · Q jutsu · Space jump ×2 · Shift sprint · ESC menu</div>
+    <button id="autofire-btn" class="icon-btn" title="Auto-fire on/off">🎯</button>
+    <button id="mute-btn" class="icon-btn">🔊</button>
+    <button id="btn-pause" class="icon-btn">⏸</button>
+  </div>
+
+  <!-- damage numbers layer -->
+  <div id="dmg-layer"></div>
+  <div id="edge-arrows"></div>
+
+  <!-- touch controls -->
+  <div id="touch-layer" class="hidden">
+    <div id="joy-zone"><div id="joy-knob"></div></div>
+    <div class="touch-btns">
+      <button id="touch-skill">🌀</button>
+      <button id="touch-weapon">🗡</button>
+      <button id="touch-jump">▲</button>
+      <button id="touch-fire">◎</button>
+    </div>
+  </div>
+
+  <!-- pause menu -->
+  <div id="pause-menu" class="overlay hidden">
+    <div class="card pause-card">
+      <h2>PAUSED</h2>
+      <button id="btn-resume" class="btn btn-play">RESUME</button>
+      <button id="btn-pause-howto" class="btn btn-secondary">How to Play</button>
+      <button id="btn-quit" class="btn btn-danger">Abandon Mission</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= RESULTS ======================= -->
+<section id="screen-results" class="screen">
+  <div class="subpage results-wrap">
+    <h2 id="results-title">🏆 VICTORY!</h2>
+    <p id="results-sub" class="results-sub"></p>
+    <div class="card">
+      <table id="results-table">
+        <thead><tr><th>#</th><th>Ninja</th><th>Character</th><th>Kills</th><th>Damage</th><th>Healed</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="results-btns">
+      <button id="btn-again" class="btn btn-play">PLAY AGAIN</button>
+      <button id="btn-home" class="btn btn-secondary">Home</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= MODALS ======================= -->
+<div id="modal-howto" class="overlay hidden">
+  <div class="card modal-card">
+    <h2>📜 HOW TO PLAY</h2>
+    <div class="howto-grid">
+      <div>
+        <h4>🎯 GOAL</h4>
+        <p>Last ninja (or squad) standing wins. Everyone starts with <b>200 HP</b>. The Akatsuki barrier shrinks — stay inside the ⛩ circle or burn!</p>
+        <h4>🕹 CONTROLS</h4>
+        <ul>
+          <li><b>WASD</b> move · <b>Mouse</b> aim · <b>LMB</b> throw weapon</li>
+          <li><b>1 / 2 / 3</b> or wheel: Kunai / Shuriken / Paper Bomb</li>
+          <li><b>Q</b> signature jutsu · <b>Space</b> jump (double-tap = double jump!)</li>
+          <li><b>Shift</b> chakra sprint · <b>ESC</b> pause</li>
+          <li><b>Walk over 🍜 ramen</b> to heal 60 HP</li>
+        </ul>
+      </div>
+      <div>
+        <h4>🌀 SIGNATURE JUTSU</h4>
+        <ul>
+          <li><b>Naruto — Rasengan:</b> 70 dmg point-blank chakra sphere + huge knockback</li>
+          <li><b>Sasuke — Chidori:</b> 14m lightning dash, 55 dmg + stun</li>
+          <li><b>Lee — Taijutsu Barrage:</b> 5 flying kicks lock one enemy (60 dmg)</li>
+          <li><b>Hinata — Byakugan:</b> see enemies through walls for 8s + speed</li>
+          <li><b>Sakura — Medical Ninjutsu:</b> heal self 80 + squadmates 60</li>
+        </ul>
+        <h4>⚠ NINJA LAW</h4>
+        <p>Kunai, shuriken and paper bombs only. <b>Guns are forbidden</b> in the Leaf Village. 🍃</p>
+      </div>
+    </div>
+    <button id="btn-howto-close" class="btn btn-play">GOT IT!</button>
+  </div>
+</div>
+
+<div id="modal-settings" class="overlay hidden">
+  <div class="card modal-card small">
+    <h2>⚙ SETTINGS</h2>
+    <label>Sensitivity <input id="set-sens" type="range" min="0.2" max="3" step="0.1" value="1"><b id="set-sens-v">1.0</b></label>
+    <label>Volume <input id="set-vol" type="range" min="0" max="1" step="0.05" value="0.6"><b id="set-vol-v">60%</b></label>
+    <label>Quality
+      <select id="set-quality">
+        <option value="high">High</option>
+        <option value="med" selected>Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </label>
+    <label class="row"><input id="set-invertY" type="checkbox"> Invert Y</label>
+    <label class="row"><input id="set-shake" type="checkbox" checked> Screen shake</label>
+    <button id="btn-settings-close" class="btn btn-play">DONE</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// Show boot errors on the loading screen instead of a stuck black loader.
+// (Classic script runs before the module below, so it catches module failures too.)
+window.addEventListener('error', function (e) {
+  var el = document.getElementById('loading-msg');
+  var box = document.getElementById('loading');
+  if (el && box && !box.classList.contains('hidden')) {
+    el.textContent = 'Error: ' + ((e && e.message) || 'failed to load');
+    el.style.color = '#ff6b6b';
+  }
+}, true);
+window.addEventListener('unhandledrejection', function (e) {
+  var el = document.getElementById('loading-msg');
+  var box = document.getElementById('loading');
+  if (el && box && !box.classList.contains('hidden')) {
+    var r = e && e.reason;
+    el.textContent = 'Error: ' + ((r && (r.message || r)) || 'failed to load');
+    el.style.color = '#ff6b6b';
+  }
+});
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

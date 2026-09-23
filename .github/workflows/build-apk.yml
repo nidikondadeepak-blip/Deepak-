@@ -1,0 +1,108 @@
+# Builds the Shinobi Arena Android APK (offline demo, Capacitor + Gradle)
+# and publishes it to the "latest" release. Triggers on every app push.
+# Signed with the committed release keystore so updates install over each other.
+name: Build Android APK
+
+on:
+  push:
+    branches: ['arena/01a0be69-deepak']
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'scripts/**'
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      direct_apk:
+        description: 'Also commit APK into direct/ for in-chat delivery (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build web assets
+        run: node scripts/build-pages.mjs
+
+      - name: Sync web assets into Android project
+        run: |
+          npx cap sync android || echo "cap sync reported an issue, continuing with manual copy"
+          rm -rf android/app/src/main/assets/public
+          mkdir -p android/app/src/main/assets/public
+          cp -R docs/. android/app/src/main/assets/public/
+          cp capacitor.config.json android/app/src/main/assets/
+          ls android/app/src/main/assets/public/index.html
+
+      - name: Build release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          {
+            echo "== java =="; java -version 2>&1
+            echo "== ANDROID_HOME=$ANDROID_HOME ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT =="
+            echo "== wrapper =="; grep distributionUrl gradle/wrapper/gradle-wrapper.properties
+            echo "== settings =="; cat settings.gradle
+          } > /tmp/gradle.log 2>&1
+          ./gradlew assembleRelease --no-daemon >> /tmp/gradle.log 2>&1 || {
+            echo "GRADLE FAILED - error summary:"
+            grep -E "What went wrong|Caused by|FAILED|FAILURE:|Execution failed|error:" /tmp/gradle.log | head -n 20 | sed 's/^/::error::/'
+            grep -A10 "What went wrong" /tmp/gradle.log | head -n 14 | sed 's/^/::error::/'
+            exit 1
+          }
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk shinobi-arena.apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shinobi-arena-apk
+          path: shinobi-arena.apk
+
+      - name: Publish to latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Shinobi Arena (Android APK)
+          body: |
+            🍃 **Shinobi Arena** — Naruto 3D battle royale for Android (offline demo: you vs 7 bots).
+            1. Download `shinobi-arena.apk` below
+            2. Open it on your phone → Allow "install unknown apps" if asked → Install
+            3. Play! Believe it!
+            (If an old version says "App not installed", uninstall the old one first — once — then all future updates install directly.)
+          files: shinobi-arena.apk
+
+      - name: Commit direct APK into repo (on demand)
+        if: ${{ inputs.direct_apk == 'true' || contains(github.event.head_commit.message, '[direct-apk]') }}
+        run: |
+          git config user.name "arena-bot"
+          git config user.email "arena-bot@example.com"
+          mkdir -p direct
+          cp shinobi-arena.apk direct/shinobi-arena.apk
+          git add -f direct/shinobi-arena.apk
+          git commit -m "direct APK (on-demand delivery) [skip ci]" || echo "no changes to commit"
+          git push origin HEAD:${{ github.ref_name }}

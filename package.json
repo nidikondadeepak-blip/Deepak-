@@ -1,0 +1,25 @@
+{
+  "name": "shinobi-arena",
+  "version": "1.0.0",
+  "description": "Shinobi Arena — a colorful 3D anime multiplayer battle-royale set in the Naruto universe (Konoha). Ninja weapons only, 200 HP, 5 heroes with signature jutsu.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "three": "^0.160.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
+  }
+}
